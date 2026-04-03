@@ -44,10 +44,46 @@ async function initSupabase() {
                     updateUIForLoggedOutUser();
                 }
             });
+        } else {
+            // Supabase not loaded - use localStorage fallback
+            console.log('Supabase not loaded, using localStorage fallback');
+            useLocalStorageFallback();
         }
-    } catch (err) {
+        } catch (err) {
         console.error('Supabase init error:', err);
+        useLocalStorageFallback();
     }
+}
+
+/* ═══ LOCAL STORAGE FALLBACK ═══ */
+function useLocalStorageFallback() {
+    // Use localStorage when Supabase is not available
+    const stored = localStorage.getItem('yumbot_local_user');
+    if (stored) {
+        try {
+            const user = JSON.parse(stored);
+            currentUser = { id: user.id, email: user.email };
+            userProfile = user;
+            hasCompletedPreferences = user.hasCompletedPreferences || false;
+            showMainApp();
+        } catch (e) {}
+    }
+}
+
+function saveToLocalStorage() {
+    if (userProfile) {
+        localStorage.setItem('yumbot_local_user', JSON.stringify(userProfile));
+    }
+}
+
+function hashPassword(password) {
+    let hash = 0;
+    for (let i = 0; i < password.length; i++) {
+        const char = password.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return hash.toString();
 }
 
 /* ═══ USER PROFILE FUNCTIONS ═══ */
@@ -305,49 +341,67 @@ async function handleSignup(event) {
     const email = document.getElementById('signupEmail').value;
     const password = document.getElementById('signupPassword').value;
     
-    if (!supabase) {
-        showAuthError('Unable to connect. Please refresh and try again.');
-        return;
-    }
-    
-    try {
-        const { data, error } = await supabase.auth.signUp({
-            email: email,
-            password: password,
-            options: { data: { display_name: name } }
-        });
-        
-        if (error) throw error;
-        
-        // Create user profile
-        if (data.user) {
-            const { error: profileError } = await supabase
-                .from('user_profiles')
-                .insert({
-                    id: data.user.id,
-                    email: email,
-                    display_name: name,
-                    streak_count: 0,
-                    longest_streak: 0,
-                    mastery_level: 0,
-                    total_meals_planned: 0,
-                    badges: '[]',
-                    kudos_given: 0,
-                    hasCompletedPreferences: 0
-                });
+    // Use Supabase if available
+    if (supabase) {
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email: email,
+                password: password,
+                options: { data: { display_name: name } }
+            });
             
-            if (profileError && !profileError.message.includes('duplicate')) {
-                console.error('Profile error:', profileError);
+            if (error) throw error;
+            
+            if (data.user) {
+                const { error: profileError } = await supabase
+                    .from('user_profiles')
+                    .insert({
+                        id: data.user.id,
+                        email: email,
+                        display_name: name,
+                        streak_count: 0,
+                        longest_streak: 0,
+                        mastery_level: 0,
+                        total_meals_planned: 0,
+                        badges: '[]',
+                        kudos_given: 0,
+                        hasCompletedPreferences: 0
+                    });
             }
+            
+            showAuthSuccess('Account created! Check your email to confirm, then log in.');
+            closeAuthModal();
+            showMainApp();
+            toast('Welcome, ' + name + '!');
+            show('home');
+        } catch (err) {
+            showAuthError(err.message);
         }
+    } else {
+        // LocalStorage fallback
+        const newUser = {
+            id: 'local_' + Date.now(),
+            email: email,
+            passwordHash: hashPassword(password),
+            display_name: name,
+            streak_count: 0,
+            longest_streak: 0,
+            mastery_level: 0,
+            total_meals_planned: 0,
+            badges: [],
+            kudos_given: 0,
+            hasCompletedPreferences: false
+        };
         
-        showAuthSuccess('Account created! Check your email to confirm, then log in.');
+        currentUser = { id: newUser.id, email: newUser.email };
+        userProfile = newUser;
+        saveToLocalStorage();
+        
+        showAuthSuccess('Account created! Welcome, ' + name + '!');
         closeAuthModal();
         showMainApp();
         toast('Welcome, ' + name + '!');
         show('home');
-    } catch (err) {
-        showAuthError(err.message);
     }
 }
 
@@ -357,29 +411,52 @@ async function handleLogin(event) {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     
-    if (!supabase) {
-        showAuthError('Unable to connect. Please refresh and try again.');
-        return;
-    }
-    
-    try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
-        
-        if (error) throw error;
-        
-        currentUser = data.user;
-        await loadUserProfile();
-        
-        closeAuthModal();
-        showMainApp();
-        updateGamificationUI();
-        toast('Welcome back, ' + (userProfile?.display_name || 'User') + '!');
-        show('home');
-    } catch (err) {
-        showAuthError(err.message);
+    // Use Supabase if available
+    if (supabase) {
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: email,
+                password: password
+            });
+            
+            if (error) throw error;
+            
+            currentUser = data.user;
+            await loadUserProfile();
+            
+            closeAuthModal();
+            showMainApp();
+            updateGamificationUI();
+            toast('Welcome back, ' + (userProfile?.display_name || 'User') + '!');
+            show('home');
+        } catch (err) {
+            showAuthError(err.message);
+        }
+    } else {
+        // LocalStorage fallback
+        const stored = localStorage.getItem('yumbot_local_user');
+        if (stored) {
+            try {
+                const user = JSON.parse(stored);
+                if (user.email === email && user.passwordHash === hashPassword(password)) {
+                    currentUser = { id: user.id, email: user.email };
+                    userProfile = user;
+                    hasCompletedPreferences = user.hasCompletedPreferences || false;
+                    
+                    closeAuthModal();
+                    showMainApp();
+                    updateGamificationUI();
+                    toast('Welcome back, ' + (user.display_name || 'User') + '!');
+                    show('home');
+                } else {
+                    showAuthError('Incorrect password.');
+                }
+            } catch (e) {
+                showAuthError('Login error. Please try again.');
+            }
+        } else {
+            showAuthError('No account found with this email.');
+        }
     }
 }
 
