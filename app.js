@@ -1,67 +1,8 @@
-/* YUMBOT — Application Logic v10.0 + Gamification + Landing Page */
+/* YUMBOT — Application Logic v11.0 + Backend API */
 
-/* ═══ LOCAL STORAGE CONFIG ═══ */
-const STORAGE_KEYS = {
-    USERS: 'yumbot_users',
-    CURRENT_USER: 'yumbot_current_user',
-    PROFILE: 'yumbot_profile',
-    MEAL_PLANS: 'yumbot_meal_plans',
-    FEEDBACKS: 'yumbot_feedbacks'
-};
-
-function getUsers() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.USERS) || '[]');
-}
-
-function saveUsers(users) {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-}
-
-function hashPassword(password) {
-    let hash = 0;
-    for (let i = 0; i < password.length; i++) {
-        const char = password.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return hash.toString();
-}
-
-function initLocalStorage() {
-    if (!localStorage.getItem(STORAGE_KEYS.USERS)) {
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.MEAL_PLANS)) {
-        localStorage.setItem(STORAGE_KEYS.MEAL_PLANS, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.FEEDBACKS)) {
-        localStorage.setItem(STORAGE_KEYS.FEEDBACKS, JSON.stringify([]));
-    }
-}
-
-function initCurrentUser() {
-    const stored = localStorage.getItem(STORAGE_KEYS.PROFILE);
-    if (stored) {
-        userProfile = JSON.parse(stored);
-        hasCompletedPreferences = userProfile.hasCompletedPreferences || false;
-        currentUser = { id: userProfile.user_id || 'local', email: userProfile.email };
-        showMainApp();
-    }
-}
-
-function saveProfileToLocal() {
-    if (userProfile) {
-        userProfile.hasCompletedPreferences = hasCompletedPreferences;
-        localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(userProfile));
-        
-        let users = getUsers();
-        let userIndex = users.findIndex(u => u.id === userProfile.user_id);
-        if (userIndex >= 0) {
-            users[userIndex] = { ...users[userIndex], ...userProfile };
-            saveUsers(users);
-        }
-    }
-}
+/* ═══ API CONFIG ═══ */
+const API_URL = ''; // Empty = same origin (uses backend server at http://localhost:3000)
+const ADMIN_KEY = 'yumbot2024';
 
 let currentUser = null;
 let userProfile = null;
@@ -71,7 +12,60 @@ let lastPlanCompletionDate = null;
 let isDarkMode = false;
 let isAdminMode = false;
 let currentAuthForm = 'login';
-const ADMIN_PASSWORD = 'yumbot2024';
+
+/* ═══ API HELPERS ═══ */
+async function apiCall(endpoint, options = {}) {
+    try {
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers
+        };
+        
+        if (currentUser) {
+            headers['x-user-id'] = currentUser.id;
+        }
+        
+        const response = await fetch(API_URL + endpoint, {
+            ...options,
+            headers
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'API error');
+        }
+        
+        return data;
+    } catch (err) {
+        console.error('API Error:', err);
+        throw err;
+    }
+}
+
+async function saveProfileToBackend() {
+    if (userProfile && currentUser) {
+        try {
+            await apiCall('/api/profile', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    display_name: userProfile.display_name,
+                    streak_count: userProfile.streak_count,
+                    longest_streak: userProfile.longest_streak,
+                    mastery_level: userProfile.mastery_level,
+                    total_meals_planned: userProfile.total_meals_planned,
+                    badges: userProfile.badges || [],
+                    kudos_given: userProfile.kudos_given || 0,
+                    hasCompletedPreferences: hasCompletedPreferences
+                })
+            });
+        } catch (err) {
+            console.error('Failed to save profile:', err);
+        }
+    }
+}
+
+const saveProfileToLocal = saveProfileToBackend;
 
 /* ═══ DARK MODE ═══ */
 function toggleDarkMode() {
@@ -123,13 +117,6 @@ function initLocalStorage() {
         hasCompletedPreferences = userProfile.hasCompletedPreferences || false;
         currentUser = { id: userProfile.user_id || 'local', email: userProfile.email };
         showMainApp();
-    }
-}
-
-function saveProfileToLocal() {
-    if (userProfile) {
-        userProfile.hasCompletedPreferences = hasCompletedPreferences;
-        localStorage.setItem('yumbot_profile', JSON.stringify(userProfile));
     }
 }
 
@@ -258,8 +245,6 @@ function scrollToCrew() {
     }
 }
 
-/* Auth functions are handled in signup/login below */
-
 async function handleSignup(event) {
     event.preventDefault();
     showAuthLoading(true);
@@ -267,44 +252,25 @@ async function handleSignup(event) {
     const email = document.getElementById('signupEmail').value;
     const password = document.getElementById('signupPassword').value;
     
-    let users = getUsers();
-    
-    // Check if email already exists
-    if (users.find(u => u.email === email)) {
-        showAuthError('An account with this email already exists.');
-        return;
+    try {
+        const data = await apiCall('/api/signup', {
+            method: 'POST',
+            body: JSON.stringify({ name, email, password })
+        });
+        
+        currentUser = { id: data.user.id, email: data.user.email };
+        userProfile = { ...data.user };
+        localStorage.setItem('yumbot_user_id', data.user.id);
+        
+        showAuthSuccess('Account created! Welcome, ' + name + '!');
+        closeAuthModal();
+        showMainApp();
+        updateGamificationUI();
+        toast('Welcome, ' + name + '!');
+        show('home');
+    } catch (err) {
+        showAuthError(err.message);
     }
-    
-    // Create new user
-    const newUser = {
-        id: 'user_' + Date.now(),
-        email: email,
-        passwordHash: hashPassword(password),
-        display_name: name,
-        streak_count: 0,
-        longest_streak: 0,
-        mastery_level: 0,
-        total_meals_planned: 0,
-        badges: [],
-        kudos_given: 0,
-        hasCompletedPreferences: false,
-        created_at: new Date().toISOString()
-    };
-    
-    users.push(newUser);
-    saveUsers(users);
-    
-    // Set as current user
-    userProfile = { ...newUser };
-    currentUser = { id: newUser.id, email: newUser.email };
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(userProfile));
-    
-    showAuthSuccess('Account created! Welcome, ' + name + '!');
-    closeAuthModal();
-    showMainApp();
-    updateGamificationUI();
-    toast('Welcome, ' + name + '!');
-    show('home');
 }
 
 async function handleLogin(event) {
@@ -313,35 +279,31 @@ async function handleLogin(event) {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     
-    let users = getUsers();
-    const user = users.find(u => u.email === email);
-    
-    if (!user) {
-        showAuthError('No account found with this email.');
-        return;
+    try {
+        const data = await apiCall('/api/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password })
+        });
+        
+        currentUser = { id: data.user.id, email: data.user.email };
+        userProfile = data.user;
+        hasCompletedPreferences = data.user.hasCompletedPreferences || false;
+        localStorage.setItem('yumbot_user_id', data.user.id);
+        
+        closeAuthModal();
+        showMainApp();
+        updateGamificationUI();
+        toast('Welcome back, ' + (data.user.display_name || 'User') + '!');
+        show('home');
+    } catch (err) {
+        showAuthError(err.message);
     }
-    
-    if (user.passwordHash !== hashPassword(password)) {
-        showAuthError('Incorrect password.');
-        return;
-    }
-    
-    // Login successful
-    userProfile = { ...user };
-    currentUser = { id: user.id, email: user.email };
-    localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(userProfile));
-    
-    closeAuthModal();
-    showMainApp();
-    updateGamificationUI();
-    toast('Welcome back, ' + (user.display_name || 'User') + '!');
-    show('home');
 }
 
 function handleLogout() {
     currentUser = null;
     userProfile = null;
-    localStorage.removeItem(STORAGE_KEYS.PROFILE);
+    localStorage.removeItem('yumbot_user_id');
     updateUIForLoggedOutUser();
     toast('Logged out');
 }
@@ -1081,7 +1043,7 @@ document.querySelectorAll('.star').forEach(function(s, i) { s.classList.toggle('
 document.getElementById('stlbl').textContent = SLBLS[n] || '';
 }
 
-function submitFB() {
+async function submitFB() {
 if (!S.star) {
 toast('Please tap a star to rate first');
 return;
@@ -1091,16 +1053,15 @@ var feedbackText = document.getElementById('fbc').value || '';
 var lovedMeals = document.getElementById('fbl').value || '';
 var rating = S.star;
 
-// Save to localStorage
-var feedbacks = JSON.parse(localStorage.getItem(STORAGE_KEYS.FEEDBACKS) || '[]');
-feedbacks.push({
-    user_id: currentUser ? currentUser.id : 'anonymous',
-    rating: rating,
-    feedback_text: feedbackText,
-    loved_meals: lovedMeals,
-    created_at: new Date().toISOString()
-});
-localStorage.setItem(STORAGE_KEYS.FEEDBACKS, JSON.stringify(feedbacks));
+// Save to backend
+try {
+    await apiCall('/api/feedback', {
+        method: 'POST',
+        body: JSON.stringify({ rating, feedback_text: feedbackText, loved_meals: lovedMeals })
+    });
+} catch (err) {
+    console.error('Failed to save feedback:', err);
+}
 
 // Hide form, show confirmation
 document.getElementById('fbform').style.display = 'none';
@@ -1176,40 +1137,49 @@ function adminLogout() {
 }
 
 async function loadAdminStats() {
-    let users = getUsers();
-    let totalUsers = users.length;
-    let activeUsers = users.filter(u => u.hasCompletedPreferences).length;
-    let allUsers = users.map(u => ({
-        email: u.email || 'N/A',
-        name: u.display_name || 'Unknown',
-        streak: u.streak_count || 0,
-        meals: u.total_meals_planned || 0,
-        date: u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Unknown'
-    }));
-    
-    // Update stats
-    document.getElementById('statTotalUsers').textContent = totalUsers;
-    document.getElementById('statActiveUsers').textContent = activeUsers;
-    
-    // Populate table
-    const tbody = document.getElementById('adminUserTable');
-    tbody.innerHTML = '';
-    
-    allUsers.forEach(user => {
-        const row = document.createElement('tr');
-        row.style.borderBottom = '1px solid #eee';
-        row.innerHTML = `
-            <td style="padding:0.75rem">${user.email}</td>
-            <td style="padding:0.75rem">${user.name}</td>
-            <td style="padding:0.75rem">${user.streak}</td>
-            <td style="padding:0.75rem">${user.meals}</td>
-            <td style="padding:0.75rem">${user.date}</td>
-        `;
-        tbody.appendChild(row);
-    });
-    
-    if (allUsers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#999">No users found</td></tr>';
+    try {
+        const data = await fetch(API_URL + '/api/admin/users', {
+            headers: { 'x-admin-key': ADMIN_KEY }
+        }).then(r => r.json());
+        
+        let users = data.users || [];
+        let totalUsers = users.length;
+        let activeUsers = users.filter(u => u.hasCompletedPreferences).length;
+        let allUsers = users.map(u => ({
+            email: u.email || 'N/A',
+            name: u.display_name || 'Unknown',
+            streak: u.streak_count || 0,
+            meals: u.total_meals_planned || 0,
+            date: u.created_at || 'Unknown'
+        }));
+        
+        document.getElementById('statTotalUsers').textContent = totalUsers;
+        document.getElementById('statActiveUsers').textContent = activeUsers;
+        
+        const tbody = document.getElementById('adminUserTable');
+        tbody.innerHTML = '';
+        
+        allUsers.forEach(user => {
+            const row = document.createElement('tr');
+            row.style.borderBottom = '1px solid #eee';
+            row.innerHTML = `
+                <td style="padding:0.75rem">${user.email}</td>
+                <td style="padding:0.75rem">${user.name}</td>
+                <td style="padding:0.75rem">${user.streak}</td>
+                <td style="padding:0.75rem">${user.meals}</td>
+                <td style="padding:0.75rem">${user.date}</td>
+            `;
+            tbody.appendChild(row);
+        });
+        
+        if (allUsers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#999">No users found</td></tr>';
+        }
+    } catch (err) {
+        console.error('Failed to load admin stats:', err);
+        document.getElementById('statTotalUsers').textContent = '0';
+        document.getElementById('statActiveUsers').textContent = '0';
+        document.getElementById('adminUserTable').innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#999">Error loading users</td></tr>';
     }
 }
 
@@ -1231,10 +1201,7 @@ if (document.readyState === 'loading') {
     initApp();
 }
 
-function initApp() {
-    // Initialize localStorage
-    initLocalStorage();
-    
+async function initApp() {
     // Initialize dark mode
     initDarkMode();
     
@@ -1253,5 +1220,19 @@ function initApp() {
     initYearSelector();
     
     // Check if user is already logged in
-    initCurrentUser();
+    const savedUserId = localStorage.getItem('yumbot_user_id');
+    if (savedUserId) {
+        try {
+            const data = await apiCall('/api/profile');
+            if (data.user) {
+                currentUser = { id: data.user.id, email: data.user.email };
+                userProfile = data.user;
+                hasCompletedPreferences = data.user.hasCompletedPreferences || false;
+                showMainApp();
+            }
+        } catch (err) {
+            console.log('Could not restore session');
+            localStorage.removeItem('yumbot_user_id');
+        }
+    }
 }
