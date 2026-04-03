@@ -606,7 +606,9 @@
   <p class="fsub">Made with love - Improved every week - For everyone at the table</p>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js"></script>
+<script>
+window.supabaseLoaded = false;
+</script>
+<script src="app.js" onerror="console.log('App loaded without Supabase')"></script>
 </body>
 </html>
