@@ -1,4 +1,4 @@
-/* YUMBOT — Application Logic v12.0 + Supabase */
+/* YUMBOT — Application Logic v12.1 + Supabase + Better Fallback */
 
 /* ═══ SUPABASE CONFIG ═══ */
 const SUPABASE_URL = 'https://cumeufwltqapqkoefdja.supabase.co';
@@ -15,16 +15,22 @@ let isDarkMode = false;
 let isAdminMode = false;
 let currentAuthForm = 'login';
 let supabaseLoaded = false;
+let usingLocalStorage = false;
 
 /* ═══ SUPABASE INITIALIZATION ═══ */
 async function initSupabase() {
     if (supabaseLoaded) return;
     
-    try {
-        if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+    // Check if Supabase SDK is available
+    if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+        try {
             supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             supabaseLoaded = true;
             console.log('Supabase loaded successfully');
+            
+            // Test connection
+            const { data, error } = await supabase.from('user_profiles').select('id').limit(1);
+            if (error) throw error;
             
             // Check if user is already logged in
             const { data: { session } } = await supabase.auth.getSession();
@@ -44,15 +50,18 @@ async function initSupabase() {
                     updateUIForLoggedOutUser();
                 }
             });
-        } else {
-            // Supabase not loaded - use localStorage fallback
-            console.log('Supabase not loaded, using localStorage fallback');
-            useLocalStorageFallback();
-        }
+            return;
         } catch (err) {
-        console.error('Supabase init error:', err);
-        useLocalStorageFallback();
+            console.error('Supabase connection failed:', err);
+            supabase = null;
+            supabaseLoaded = false;
+        }
     }
+    
+    // Use localStorage fallback
+    console.log('Using localStorage fallback');
+    usingLocalStorage = true;
+    useLocalStorageFallback();
 }
 
 /* ═══ LOCAL STORAGE FALLBACK ═══ */
@@ -1297,10 +1306,29 @@ function adminLogout() {
 }
 
 async function loadAdminStats() {
-    if (!supabase) {
+    if (usingLocalStorage || !supabase) {
+        // Show localStorage users
+        const stored = localStorage.getItem('yumbot_local_user');
+        if (stored) {
+            try {
+                const user = JSON.parse(stored);
+                document.getElementById('statTotalUsers').textContent = '1';
+                document.getElementById('statActiveUsers').textContent = user.hasCompletedPreferences ? '1' : '0';
+                document.getElementById('adminUserTable').innerHTML = `
+                    <tr>
+                        <td style="padding:0.75rem">${user.email}</td>
+                        <td style="padding:0.75rem">${user.display_name || 'Unknown'}</td>
+                        <td style="padding:0.75rem">${user.streak_count || 0}</td>
+                        <td style="padding:0.75rem">${user.total_meals_planned || 0}</td>
+                        <td style="padding:0.75rem">Local</td>
+                    </tr>
+                `;
+                return;
+            } catch (e) {}
+        }
         document.getElementById('statTotalUsers').textContent = '0';
         document.getElementById('statActiveUsers').textContent = '0';
-        document.getElementById('adminUserTable').innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#999">Unable to connect to database</td></tr>';
+        document.getElementById('adminUserTable').innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#999">Using local mode (data not synced to server)</td></tr>';
         return;
     }
     
@@ -1366,6 +1394,13 @@ if (document.readyState === 'loading') {
 async function initApp() {
     // Initialize Supabase
     await initSupabase();
+    
+    // Show mode indicator
+    if (usingLocalStorage) {
+        setTimeout(() => {
+            toast('⚠️ Running in offline mode - data saved locally');
+        }, 2000);
+    }
     
     // Initialize dark mode
     initDarkMode();
