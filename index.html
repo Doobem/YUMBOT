@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>YUMBOT — Your Personal Meal Planner</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="styles.css"/>
+<link rel="stylesheet" href="auth.css"/>
+</head>
+<body>
+
+<!-- AUTH MODAL -->
+<div id="authModal" class="modal" style="display:none">
+  <div class="modal-content auth-card">
+    <button class="modal-close" onclick="closeAuthModal()">&times;</button>
+    
+    <!-- Login Form -->
+    <div id="loginForm" class="auth-form">
+      <div class="auth-header">
+        <div class="auth-logo">🍽️ YUMBOT</div>
+        <h2>Welcome Back!</h2>
+        <p>Sign in to continue your meal journey</p>
+      </div>
+      <form onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="you@example.com" required/>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="Your password" autocomplete="current-password" required/>
+        </div>
+        <button type="submit" class="btn-primary">Sign In</button>
+        <p class="auth-switch">Don't have an account? <a href="#" onclick="showSignup()">Sign up</a></p>
+      </form>
+    </div>
+    
+    <!-- Signup Form -->
+    <div id="signupForm" class="auth-form" style="display:none">
+      <div class="auth-header">
+        <div class="auth-logo">🍽️ YUMBOT</div>
+        <h2>Join YUMBOT</h2>
+        <p>Start your personalized meal planning journey</p>
+      </div>
+      <form onsubmit="handleSignup(event)">
+        <div class="form-group">
+          <label for="signupName">Your Name</label>
+          <input type="text" id="signupName" placeholder="Chef John" required/>
+        </div>
+        <div class="form-group">
+          <label for="signupEmail">Email</label>
+          <input type="email" id="signupEmail" placeholder="you@example.com" required/>
+        </div>
+        <div class="form-group">
+          <label for="signupPassword">Password</label>
+          <input type="password" id="signupPassword" placeholder="Min 6 characters" minlength="6" autocomplete="new-password" required/>
+        </div>
+        <button type="submit" class="btn-primary">Create Account</button>
+        <p class="auth-switch">Already have an account? <a href="#" onclick="showLogin()">Sign in</a></p>
+      </form>
+    </div>
+    
+    <div id="authLoading" class="auth-loading" style="display:none">
+      <div class="spinner"></div>
+      <p>Loading...</p>
+    </div>
+    <div id="authError" class="auth-error" style="display:none"></div>
+  </div>
+</div>
+
+<!-- LANDING PAGE -->
+<section id="page-landing" class="page landing-page">
+  <div class="landing-hero">
+    <div class="landing-bg" style="background-image: url('https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1920&q=80'); background-size: cover; background-position: center;"></div>
+    <div class="landing-overlay"></div>
+    <div class="landing-content">
+      <div class="landing-logo">
+        <svg viewBox="0 0 40 40" width="40" height="40" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:10px">
+          <path d="M12 8v16M12 12c0 0 4 1 4 6s-4 6-4 6M12 8c0-2 3-4 6-4"/>
+          <path d="M28 8v12c0 2-2 4-4 4s-4-2-4-4V8"/>
+          <line x1="20" y1="8" x2="20" y2="28"/>
+        </svg>
+        YUMBOT
+      </div>
+      <h1 class="landing-title">Your Personal<br/><span class="landing-highlight">Meal Planning</span> Assistant</h1>
+      <p class="landing-subtitle">Stop wondering "What's for dinner?" We plan your entire week of meals, create your shopping list, and track your dietary goals — all personalized just for you.</p>
+      
+      <div class="landing-cta">
+        <button class="landing-btn-primary" onclick="openAuthModal()">Get Started Free</button>
+        <button class="landing-btn-secondary" onclick="scrollToCrew()">Meet the Kitchen Crew ↓</button>
+      </div>
+      
+      <div class="landing-stats">
+        <div class="landing-stat">
+          <div class="landing-stat-num">50+</div>
+          <div class="landing-stat-label">Dietary Options</div>
+        </div>
+        <div class="landing-stat">
+          <div class="landing-stat-num">120+</div>
+          <div class="landing-stat-label">Chef-Curated Recipes</div>
+        </div>
+        <div class="landing-stat">
+          <div class="landing-stat-num">21</div>
+          <div class="landing-stat-label">Meals Per Week</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- KITCHEN CREW SECTION -->
+  <div class="crew-section" id="crewSection">
+    <div class="crew-header">
+      <h2>👨‍🍳 Meet Your Kitchen Crew</h2>
+      <p>Your personal meal planning team, working behind the scenes to make healthy eating effortless.</p>
+    </div>
+    
+    <div class="crew-grid">
+      <div class="crew-card">
+        <div class="crew-icon">🔍</div>
+        <h3>The Food Researcher</h3>
+        <p class="agent-name"><strong>Researcher Agent</strong></p>
+        <p>Studies your food preferences, dietary needs, and feedback to understand exactly what you need from your meal plans.</p>
+        <div class="crew-tag">Knows Your Taste</div>
+      </div>
+      
+      <div class="crew-card">
+        <div class="crew-icon">🎨</div>
+        <h3>The Meal Designer</h3>
+        <p class="agent-name"><strong>Designer Agent</strong></p>
+        <p>Creates your weekly meal plans, balancing variety, nutrition, and your personal preferences into the perfect schedule.</p>
+        <div class="crew-tag">Smart Planning</div>
+      </div>
+      
+      <div class="crew-card">
+        <div class="crew-icon">🛠️</div>
+        <h3>The Recipe Builder</h3>
+        <p class="agent-name"><strong>Maker Agent</strong></p>
+        <p>Turns meal plans into easy-to-follow recipes with step-by-step instructions and video guides for every dish.</p>
+        <div class="crew-tag">Step-by-Step Guides</div>
+      </div>
+      
+      <div class="crew-card">
+        <div class="crew-icon">💬</div>
+        <h3>The Friendly Guide</h3>
+        <p class="agent-name"><strong>Communicator Agent</strong></p>
+        <p>Keeps you motivated with warm, encouraging messages and lets you know your feedback helps improve YUMBOT every week.</p>
+        <div class="crew-tag">Always Encouraging</div>
+      </div>
+      
+      <div class="crew-card">
+        <div class="crew-icon">📊</div>
+        <h3>The Progress Tracker</h3>
+        <p class="agent-name"><strong>Manager Agent</strong></p>
+        <p>Monitors your meal planning journey, tracks your streaks and badges, and coordinates the whole team to help you succeed.</p>
+        <div class="crew-tag">Tracks Your Success</div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- HOW IT WORKS PREVIEW -->
+  <div class="landing-how">
+    <h2>How YUMBOT Works</h2>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="step-num">1</div>
+        <h3>Tell Us Your Needs</h3>
+        <p>2 minutes to set your dietary preferences, allergies, and cooking skill level.</p>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="how-step">
+        <div class="step-num">2</div>
+        <h3>We Plan Your Week</h3>
+        <p>Get 21 personalized meals — breakfast, lunch, and dinner for 7 days.</p>
+      </div>
+      <div class="step-arrow">→</div>
+      <div class="how-step">
+        <div class="step-num">3</div>
+        <h3>Shop & Cook</h3>
+        <p>Auto-generated shopping list sorted by aisle. Follow video guides. Track your progress.</p>
+      </div>
+    </div>
+    
+    <button class="landing-btn-primary" onclick="openAuthModal()">Start Your Journey →</button>
+  </div>
+  
+  <!-- FOOTER -->
+  <div class="landing-footer">
+    <p>YUMBOT — Making healthy eating effortless, one meal at a time.</p>
+  </div>
+</section>
+
+<!-- MAIN APP (Hidden until logged in) -->
+<header class="hdr" id="mainHeader" style="display:none">
+  <div class="hi">
+    <div class="logo" onclick="show('home')">
+      <div class="licon">
+        <svg viewBox="0 0 40 40" width="28" height="28" fill="none" stroke="white" stroke-width="2" stroke-linecap="round">
+          <path d="M12 8v16M12 12c0 0 4 1 4 6s-4 6-4 6M12 8c0-2 3-4 6-4"/>
+          <path d="M28 8v12c0 2-2 4-4 4s-4-2-4-4V8"/>
+          <line x1="20" y1="8" x2="20" y2="28"/>
+        </svg>
+      </div>
+      <div>
+        <span class="lname">YUMBOT</span>
+        <span class="ltag">Personal Meal Planner</span>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <button class="nb on" onclick="show('home')">Home</button>
+      <button class="nb" onclick="show('profile')">My Preferences</button>
+      <button class="nb" id="navPlan" onclick="checkPreferencesAccess('plan')">Meal Plan</button>
+      <button class="nb" id="navShopping" onclick="checkPreferencesAccess('shopping')">Shopping</button>
+      <button class="nb" id="navProgress" onclick="checkPreferencesAccess('progress')">📊 Progress</button>
+      <button class="nb" onclick="show('feedback')">Feedback</button>
+      <button class="nb" id="navAdmin" onclick="show('admin')">⚙️ Admin</button>
+      <label class="dark-toggle">
+        <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+        <span class="toggle-slider"></span>
+      </label>
+      <button class="nb" id="authBtn" onclick="openAuthModal()">Sign In</button>
+    </nav>
+    <button class="hbg" onclick="document.getElementById('nav').classList.toggle('open')">Menu</button>
+  </div>
+</header>
+
+<main id="mainContent" style="display:none">
+
+<!-- HOME -->
+<section id="page-home" class="page">
+  <!-- Epic Meaning Banner -->
+  <div class="hero-mission">
+    <div class="mission-badge">⭐ Your Health Hero ⭐</div>
+    <h1 class="mission-title">You're not just cooking —<br/>You're <span class="mission-highlight">nourishing your family</span></h1>
+    <div class="streak-display" id="homeStreak" style="display:none">
+      <span class="streak-fire">🔥</span>
+      <span class="streak-num" id="streakNumHome">0</span>
+      <span class="streak-text">Week Streak!</span>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-images">
+      <img class="hero-food-img hfi1" src="https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&h=300&fit=crop" alt="Fresh salad">
+      <img class="hero-food-img hfi2" src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=250&h=250&fit=crop" alt="Pancakes">
+      <img class="hero-food-img hfi3" src="https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=200&h=200&fit=crop" alt="Healthy bowl">
+    </div>
+    <div class="hcontent">
+      <div class="hbadge">50+ dietary needs covered</div>
+      <h1 class="htitle">Eat well.<br/><span class="hfire">Every single day.</span></h1>
+      <p class="hsub">Tell us what you love, what you avoid, and what your body needs. YUMBOT plans your whole week - then hands you a ready-made shopping list with zero faff.</p>
+      <div class="hbtns">
+        <button class="bfire" onclick="handleMainCTA()">Build My Meal Plan</button>
+        <button class="bghost" onclick="document.getElementById('manchor').scrollIntoView({behavior:'smooth'})">Browse Recipes</button>
+      </div>
+      <div class="hstats">
+        <div><div class="sn">50+</div><div class="sl">Dietary categories</div></div>
+        <div><div class="sn">120+</div><div class="sl">Hand-picked recipes</div></div>
+        <div><div class="sn">21</div><div class="sl">Meals per week</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAMIFICATION QUICK VIEW -->
+  <div class="gami-quick" id="gamiQuick" style="display:none">
+    <div class="gami-card">
+      <div class="gami-icon">🔥</div>
+      <div class="gami-info">
+        <div class="gami-num" id="quickStreak">0</div>
+        <div class="gami-label">Week Streak</div>
+      </div>
+    </div>
+    <div class="gami-card">
+      <div class="gami-icon">🏆</div>
+      <div class="gami-info">
+        <div class="gami-num" id="quickBadges">0</div>
+        <div class="gami-label">Badges</div>
+      </div>
+    </div>
+    <div class="gami-card">
+      <div class="gami-icon">📊</div>
+      <div class="gami-info">
+        <div class="gami-num" id="quickMastery">0%</div>
+        <div class="gami-label">Mastery</div>
+      </div>
+    </div>
+    <div class="gami-card">
+      <div class="gami-icon">🍽️</div>
+      <div class="gami-info">
+        <div class="gami-num" id="quickMeals">0</div>
+        <div class="gami-label">Meals Planned</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW IT WORKS -->
+  <div class="sec">
+    <div class="ey">How it works</div>
+    <h2 class="st">Three steps to a perfect week</h2>
+    <div class="howg">
+      <div class="hwc"><div class="hnum">01</div><span class="hico">1</span>
+        <h3>Tell us your needs</h3>
+        <p>Pick from 50+ categories - Halal, Keto, Low-FODMAP, Jain, Vegan, Kidney-Friendly and dozens more. We handle every combination including complex medical diets.</p>
+      </div>
+      <div class="hwc"><div class="hnum">02</div><span class="hico">2</span>
+        <h3>Get perfect meals</h3>
+        <p>Every breakfast, lunch, and dinner planned for your week - matched to your dietary needs, skill level, and schedule. Every recipe has a video guide you can watch.</p>
+      </div>
+      <div class="hwc"><div class="hnum">03</div><span class="hico">3</span>
+        <h3>Shop in minutes</h3>
+        <p>Your shopping list auto-generates, sorted by aisle. Tick off as you go. And we improve every single week based on your feedback - guaranteed within 7 days.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURED MEALS -->
+  <div class="mband" id="manchor">
+    <div class="minn">
+      <div class="ey">This week's picks</div>
+      <h2 class="st" style="margin-bottom:.4rem">Food worth looking forward to</h2>
+      <p style="color:var(--mu);font-weight:300">Real recipes. Stunning dishes. Real results.</p>
+      <div class="mgrid" id="home-grid"></div>
+    </div>
+  </div>
+
+  <!-- DIET PILLS -->
+  <div class="sec">
+    <div class="ey">Universal coverage</div>
+    <h2 class="st">We understand <em style="font-style:italic;background:linear-gradient(90deg,var(--y2),var(--r2),var(--p));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">your</em> needs</h2>
+    <p class="ss">From medical conditions to cultural traditions — every diet, every lifestyle, one app.</p>
+    <div class="dpband" id="dp-band"></div>
+  </div>
+</section>
+
+<!-- PROFILE -->
+<section id="page-profile" class="page">
+  <div class="pw">
+    <div class="ey">Setup</div>
+    <h2>Your Food Preferences</h2>
+    <p class="psub">Two minutes to tell us about you. We'll handle everything else.</p>
+    <div class="wprog">
+      <div class="wps on" id="wp1">1 · Who's eating</div>
+      <div class="wps" id="wp2">2 · Dietary needs</div>
+      <div class="wps" id="wp3">3 · Allergies</div>
+    </div>
+    <div class="wst active" id="ws1">
+      <h3>How many people are you cooking for?</h3>
+      <div class="cr" id="pr"><button class="cb on" onclick="setP(1,this)">Just me</button><button class="cb" onclick="setP(2,this)">2 people</button><button class="cb" onclick="setP(4,this)">Family of 4</button><button class="cb" onclick="setP(6,this)">6 or more</button></div>
+      <h3>How confident are you in the kitchen?</h3>
+      <div class="cr" id="cfr"><button class="cb on" onclick="setC('beginner',this)">Just starting out</button><button class="cb" onclick="setC('intermediate',this)">Getting there</button><button class="cb" onclick="setC('advanced',this)">Confident cook</button></div>
+      <div class="snv"><button class="bp" onclick="nxt(2)">Continue</button></div>
+    </div>
+    <div class="wst" id="ws2">
+      <h3>Pick everything that applies to you</h3>
+      <p style="color:var(--mu);font-weight:300;margin-bottom:1rem">YUMBOT shows only meals matching every choice you make.</p>
+      <div class="dgw" id="dg"></div>
+      <div class="snv"><button class="bg2" onclick="nxt(1)">Back</button><button class="bp" onclick="nxt(3)">Continue</button></div>
+    </div>
+    <div class="wst" id="ws3">
+      <h3>Any allergies we should know about?</h3>
+      <p style="color:var(--mu);font-weight:300;margin-bottom:1rem">We'll make sure none of these appear in your meals.</p>
+      <div class="agw" id="ag"></div>
+      <div class="snv" style="margin-top:2rem">
+        <button class="bg2" onclick="nxt(2)">Back</button>
+        <button class="bp big" onclick="saveP()">Save & Build My Plan</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PLAN -->
+<section id="page-plan" class="page">
+  <div class="plw">
+    <div class="plh">
+      <div>
+        <div class="ey">Your Meal Plan</div>
+        <h2 id="dateDisplay" style="font-family:var(--fd);font-size:2rem;color:var(--tx)">2026</h2>
+      </div>
+      <div class="pla">
+        <button class="bp" onclick="show('shopping')">Shopping List</button>
+      </div>
+    </div>
+    <div class="date-selector" style="margin-bottom:1.5rem">
+      <div class="ds-label">Select Year:</div>
+      <div class="ds-controls">
+        <select id="yearSelect" onchange="updateYearDisplay()"></select>
+      </div>
+    </div>
+    <div class="mp-container" id="pgrid"></div>
+    <div class="mob-plan" id="mobplan"></div>
+    <p style="color:var(--mu);font-size:.83rem;text-align:center;margin-top:1.5rem">Tap any meal to see the full recipe and watch the video</p>
+  </div>
+</section>
+
+<!-- RECIPE -->
+<section id="page-recipe" class="page">
+  <div class="rw">
+    <button class="bg2 sm" onclick="show('plan')" style="margin-bottom:2rem">Back to Plan</button>
+    <div id="rcontent"></div>
+  </div>
+</section>
+
+<!-- SHOPPING -->
+<section id="page-shopping" class="page">
+  <div class="shw">
+    <div class="shhr">
+      <div><div class="ey">Your List</div><h2>Shopping List</h2></div>
+      <div style="display:flex;gap:.65rem;flex-wrap:wrap">
+        <button class="bg2 sm" onclick="window.print()">Print</button>
+        <button class="bg2 sm" onclick="show('plan')">Plan</button>
+      </div>
+    </div>
+    <div id="shcontent"></div>
+  </div>
+</section>
+
+<!-- PROGRESS DASHBOARD (Renamed from Gamify) -->
+<section id="page-progress" class="page">
+  <div class="gami-dashboard">
+    <div class="ey">📊 Your Progress Hub</div>
+    <h2>Track Your Meal Planning Journey</h2>
+    
+    <!-- Streak Section -->
+    <div class="gami-section streak-section">
+      <div class="streak-display-large">
+        <div class="streak-flames">🔥🔥🔥</div>
+        <div class="streak-big-num" id="dashStreak">0</div>
+        <div class="streak-label">Week Streak</div>
+        <p class="streak-message" id="streakMsg">Complete your meal plan to keep your streak alive!</p>
+      </div>
+      <div class="streak-progress">
+        <div class="sp-label">Next badge: <span id="nextBadgeName">Week Warrior</span></div>
+        <div class="sp-bar"><div class="sp-fill" id="streakProgress" style="width:0%"></div></div>
+        <div class="sp-info"><span id="streakCurrent">0</span>/<span id="streakNeeded">2</span> weeks</div>
+      </div>
+    </div>
+    
+    <!-- Badges Section -->
+    <div class="gami-section">
+      <h3>🏆 Your Badges</h3>
+      <div class="badges-grid" id="badgesGrid">
+        <div class="badge-placeholder">Loading...</div>
+      </div>
+    </div>
+    
+    <!-- Mastery Section -->
+    <div class="gami-section">
+      <h3>📊 Dietary Mastery</h3>
+      <div class="mastery-container">
+        <div class="mastery-ring">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="45" fill="none" stroke="#eee" stroke-width="8"/>
+            <circle cx="50" cy="50" r="45" fill="none" stroke="url(#masteryGrad)" stroke-width="8" 
+                    stroke-dasharray="283" stroke-dashoffset="283" id="masteryCircle"/>
+            <defs>
+              <linearGradient id="masteryGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#FFD700"/>
+                <stop offset="100%" stop-color="#FF6B35"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="mastery-percent" id="masteryPercent">0%</div>
+        </div>
+        <div class="mastery-info">
+          <div class="mastery-level" id="masteryLevel">Beginner Chef</div>
+          <div class="mastery-desc">Complete more meal plans to level up!</div>
+          <div class="mastery-next">Next: <span id="nextMastery">Intermediate Chef</span></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Stats Grid -->
+    <div class="gami-section">
+      <h3>📈 Your Stats</h3>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">🍽️</div>
+          <div class="stat-num" id="statMeals">0</div>
+          <div class="stat-label">Meals Planned</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👏</div>
+          <div class="stat-num" id="statKudos">0</div>
+          <div class="stat-label">Kudos Given</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⭐</div>
+          <div class="stat-num" id="statPoints">0</div>
+          <div class="stat-label">Total Points</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">🏆</div>
+          <div class="stat-num" id="statLongest">0</div>
+          <div class="stat-label">Longest Streak</div>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+</section>
+
+<!-- FEEDBACK -->
+<section id="page-feedback" class="page">
+  <div class="fbw">
+    <div class="ey">Your voice matters</div>
+    <h2>Tell Us What You Think</h2>
+    <p style="color:var(--mu);font-weight:300;margin-top:.4rem;margin-bottom:2rem">Every piece of feedback shapes YUMBOT. You'll see changes within 7 days — guaranteed.</p>
+    <div id="fbform">
+      <div class="fg"><label class="fl">How happy are you with YUMBOT this week?</label>
+        <div class="starr"><button class="star" onclick="setStar(1)">&#9733;</button><button class="star" onclick="setStar(2)">&#9733;</button><button class="star" onclick="setStar(3)">&#9733;</button><button class="star" onclick="setStar(4)">&#9733;</button><button class="star" onclick="setStar(5)">&#9733;</button></div>
+        <p class="stlbl" id="stlbl">Tap a star to rate</p>
+      </div>
+      <div class="fg"><label class="fl" for="fbc">What could be better?</label><textarea id="fbc" rows="4" placeholder="e.g. more quick weeknight recipes, easier shopping list..."></textarea></div>
+      <div class="fg"><label class="fl" for="fbl">Which meals did you love?</label><input type="text" id="fbl" placeholder="e.g. the chickpea curry was incredible!"/></div>
+      <button class="bp big" onclick="submitFB()">Send My Thoughts</button>
+    </div>
+    <div class="tcard" id="fbthanks" style="display:none">
+      <h3>Thank you so much!</h3>
+      <p>Your feedback has been heard. We're already working on improvements — <strong style="color:var(--r)">check back in 7 days</strong> to see what's new.</p>
+      <button class="bp" style="margin-top:1.5rem" onclick="show('home')">Back to Home</button>
+    </div>
+  </div>
+</section>
+
+<!-- ADMIN PANEL -->
+<section id="page-admin" class="page">
+  <div class="pw">
+    <div class="ey">Admin Dashboard</div>
+    <h2>YUMBOT Analytics</h2>
+    
+    <!-- Admin Login (if not authenticated) -->
+    <div id="adminLogin" style="max-width:400px;margin:2rem auto;text-align:center">
+      <p>Enter admin password to view analytics:</p>
+      <input type="password" id="adminPassword" placeholder="Admin password" style="padding:.8rem;border:1px solid #ddd;border-radius:8px;width:100%;margin:.5rem 0"/>
+      <button class="bp" onclick="checkAdminPassword()">Access Dashboard</button>
+      <p id="adminError" style="color:#e74c3c;display:none">Incorrect password</p>
+    </div>
+    
+    <!-- Admin Content (hidden until authenticated) -->
+    <div id="adminContent" style="display:none">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin:2rem 0">
+        <div class="gami-card" style="text-align:center;padding:1.5rem">
+          <div style="font-size:2.5rem" id="statTotalUsers">0</div>
+          <div style="color:var(--mu)">Total Users</div>
+        </div>
+        <div class="gami-card" style="text-align:center;padding:1.5rem">
+          <div style="font-size:2.5rem" id="statActiveUsers">0</div>
+          <div style="color:var(--mu)">Active Users</div>
+        </div>
+      </div>
+      
+      <h3>User Details</h3>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden">
+          <thead style="background:var(--y)">
+            <tr>
+              <th style="padding:1rem;text-align:left">Email</th>
+              <th style="padding:1rem;text-align:left">Name</th>
+              <th style="padding:1rem;text-align:left">Streak</th>
+              <th style="padding:1rem;text-align:left">Meals Planned</th>
+              <th style="padding:1rem;text-align:left">Joined</th>
+            </tr>
+          </thead>
+          <tbody id="adminUserTable"></tbody>
+        </table>
+      </div>
+      
+      <button class="bg2" onclick="adminLogout()" style="margin-top:2rem">Logout</button>
+    </div>
+  </div>
+</section>
+
+<!-- RESEARCHER AGENT POPUP -->
+<div id="researcherPopup" class="modal" style="display:none">
+  <div class="modal-content researcher-card">
+    <button class="modal-close" onclick="closeResearcherPopup()">&times;</button>
+    <div class="researcher-header">
+      <div class="researcher-icon">🔍</div>
+      <div class="researcher-info">
+        <h3>Researcher Agent</h3>
+        <p>Insight Analyst</p>
+      </div>
+    </div>
+    <div class="researcher-message">
+      <p id="researcherText">Got your feedback! Thank you so much for taking the time to share your thoughts. Your input helps make YUMBOT better for everyone! 🍽️</p>
+    </div>
+    <div class="researcher-actions">
+      <p class="researcher-note">We'll review your feedback and make improvements — you'll see changes within 7 days! ✨</p>
+      <button class="bp" onclick="closeResearcherPopup()">Got it!</button>
+    </div>
+  </div>
+</div>
+</main>
+
+<!-- MAIN APP FOOTER (Hidden until logged in) -->
+<footer class="foot" id="mainFooter" style="display:none">
+  <div class="flogo">
+    <svg viewBox="0 0 40 40" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;margin-right:8px">
+      <path d="M12 8v16M12 12c0 0 4 1 4 6s-4 6-4 6M12 8c0-2 3-4 6-4"/>
+      <path d="M28 8v12c0 2-2 4-4 4s-4-2-4-4V8"/>
+      <line x1="20" y1="8" x2="20" y2="28"/>
+    </svg>
+    YUMBOT
+  </div>
+  <p class="fsub">Made with love - Improved every week - For everyone at the table</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
