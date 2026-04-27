@@ -1,11 +1,9 @@
-/* YUMBOT — Application Logic v12.1 + Supabase + Better Fallback */
+/* YUMBOT — Application Logic v11.0 + Backend API */
 
-/* ═══ SUPABASE CONFIG ═══ */
-const SUPABASE_URL = 'https://cumeufwltqapqkoefdja.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1bWV1ZndsdHFhcHFrb2VmZGphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxMjIzMjEsImV4cCI6MjA5MDY5ODMyMX0.sf4mm9fhhJytytZYcQMwGGQHfxlzoqb2Tgheef7rhtE';
-const ADMIN_PASSWORD = 'yumbot2024';
+/* ═══ API CONFIG ═══ */
+const API_URL = ''; // Empty = same origin, uses backend server
+const ADMIN_KEY = 'yumbot2024';
 
-let supabase = null;
 let currentUser = null;
 let userProfile = null;
 let hasCompletedPreferences = false;
@@ -14,156 +12,43 @@ let lastPlanCompletionDate = null;
 let isDarkMode = false;
 let isAdminMode = false;
 let currentAuthForm = 'login';
-let supabaseLoaded = false;
-let usingLocalStorage = false;
 
-/* ═══ SUPABASE INITIALIZATION ═══ */
-async function initSupabase() {
-    if (supabaseLoaded) return;
-    
-    // Check if Supabase SDK is available
-    if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-        try {
-            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            supabaseLoaded = true;
-            console.log('Supabase loaded successfully');
-            
-            // Test connection
-            const { data, error } = await supabase.from('user_profiles').select('id').limit(1);
-            if (error) throw error;
-            
-            // Check if user is already logged in
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user) {
-                currentUser = session.user;
-                await loadUserProfile();
-            }
-            
-            // Listen for auth changes
-            supabase.auth.onAuthStateChange((event, session) => {
-                if (session?.user) {
-                    currentUser = session.user;
-                    loadUserProfile();
-                } else {
-                    currentUser = null;
-                    userProfile = null;
-                    updateUIForLoggedOutUser();
-                }
-            });
-            return;
-        } catch (err) {
-            console.error('Supabase connection failed:', err);
-            supabase = null;
-            supabaseLoaded = false;
-        }
-    }
-    
-    // Use localStorage fallback
-    console.log('Using localStorage fallback');
-    usingLocalStorage = true;
-    useLocalStorageFallback();
-}
-
-/* ═══ LOCAL STORAGE FALLBACK ═══ */
-function useLocalStorageFallback() {
-    // Use localStorage when Supabase is not available
-    const stored = localStorage.getItem('yumbot_local_user');
-    if (stored) {
-        try {
-            const user = JSON.parse(stored);
-            currentUser = { id: user.id, email: user.email };
-            userProfile = user;
-            hasCompletedPreferences = user.hasCompletedPreferences || false;
-            showMainApp();
-        } catch (e) {}
-    }
-}
-
-function saveToLocalStorage() {
-    if (userProfile) {
-        localStorage.setItem('yumbot_local_user', JSON.stringify(userProfile));
-    }
-}
-
-function hashPassword(password) {
-    let hash = 0;
-    for (let i = 0; i < password.length; i++) {
-        const char = password.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return hash.toString();
-}
-
-/* ═══ USER PROFILE FUNCTIONS ═══ */
-async function loadUserProfile() {
-    if (!supabase || !currentUser) return;
-    
+/* ═══ API HELPERS ═══ */
+async function apiCall(endpoint, options = {}) {
     try {
-        const { data, error } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', currentUser.id)
-            .single();
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers
+        };
         
-        if (error && error.code !== 'PGRST116') {
-            console.error('Profile load error:', error);
-            return;
+        if (currentUser) {
+            headers['x-user-id'] = currentUser.id;
         }
         
-        if (data) {
-            userProfile = data;
-            hasCompletedPreferences = data.hasCompletedPreferences === 1 || data.hasCompletedPreferences === true;
-        } else {
-            // Create profile if doesn't exist
-            const name = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || 'User';
-            const { error: insertError } = await supabase
-                .from('user_profiles')
-                .insert({
-                    id: currentUser.id,
-                    email: currentUser.email,
-                    display_name: name,
-                    streak_count: 0,
-                    longest_streak: 0,
-                    mastery_level: 0,
-                    total_meals_planned: 0,
-                    badges: '[]',
-                    kudos_given: 0,
-                    hasCompletedPreferences: 0
-                });
-            
-            if (!insertError) {
-                userProfile = { id: currentUser.id, email: currentUser.email, display_name: name };
-            }
+        const response = await fetch(API_URL + endpoint, {
+            ...options,
+            headers
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'API error');
         }
+        
+        return data;
     } catch (err) {
-        console.error('Load profile error:', err);
+        console.error('API Error:', err);
+        throw err;
     }
 }
 
-async function saveProfileToSupabase() {
-    if (!supabase || !currentUser || !userProfile) return;
-    
-    try {
-        await supabase
-            .from('user_profiles')
-            .update({
-                display_name: userProfile.display_name,
-                streak_count: userProfile.streak_count,
-                longest_streak: userProfile.longest_streak,
-                mastery_level: userProfile.mastery_level,
-                total_meals_planned: userProfile.total_meals_planned,
-                badges: userProfile.badges || '[]',
-                kudos_given: userProfile.kudos_given || 0,
-                hasCompletedPreferences: hasCompletedPreferences ? 1 : 0
-            })
-            .eq('id', currentUser.id);
-    } catch (err) {
-        console.error('Save profile error:', err);
-    }
+/* ═══ DARK MODE ═══ */
+function toggleDarkMode() {
+    isDarkMode = document.getElementById('darkModeToggle').checked;
+    document.body.classList.toggle('dark-mode', isDarkMode);
+    localStorage.setItem('yumbot_darkMode', isDarkMode);
 }
-
-const saveProfileToBackend = saveProfileToSupabase;
 
 /* ═══ DARK MODE ═══ */
 function toggleDarkMode() {
@@ -181,6 +66,13 @@ function initDarkMode() {
 }
 
 function showMainApp() {
+    // Demo mode: if no user, create a demo user
+    if (!currentUser) {
+        currentUser = { id: 'demo-user', email: 'demo@yumbot.app' };
+        userProfile = { display_name: 'Demo User', streak_count: 0, mastery_level: 0, total_meals_planned: 0, longest_streak: 0 };
+        hasCompletedPreferences = true;
+    }
+    
     const landing = document.getElementById('page-landing');
     const mainHeader = document.getElementById('mainHeader');
     const mainContent = document.getElementById('mainContent');
@@ -206,17 +98,33 @@ function showMainApp() {
     
     updateNavAccess();
     updateGamificationUI();
+    show('home');
 }
 
-function initLocalStorage() {
-    const stored = localStorage.getItem('yumbot_profile');
-    if (stored) {
-        userProfile = JSON.parse(stored);
-        hasCompletedPreferences = userProfile.hasCompletedPreferences || false;
-        currentUser = { id: userProfile.user_id || 'local', email: userProfile.email };
-        showMainApp();
+async function saveProfileToBackend() {
+    if (userProfile && currentUser) {
+        try {
+            await apiCall('/api/profile', {
+                method: 'PUT',
+                body: JSON.stringify({
+                    display_name: userProfile.display_name,
+                    streak_count: userProfile.streak_count,
+                    longest_streak: userProfile.longest_streak,
+                    mastery_level: userProfile.mastery_level,
+                    total_meals_planned: userProfile.total_meals_planned,
+                    badges: userProfile.badges || [],
+                    kudos_given: userProfile.kudos_given || 0,
+                    hasCompletedPreferences: hasCompletedPreferences
+                })
+            });
+        } catch (err) {
+            console.error('Failed to save profile:', err);
+        }
     }
 }
+
+// Alias for compatibility
+const saveProfileToLocal = saveProfileToBackend;
 
 /* ═══ ACCESS CONTROL FUNCTIONS ═══ */
 function checkPreferencesAccess(page) {
@@ -350,67 +258,25 @@ async function handleSignup(event) {
     const email = document.getElementById('signupEmail').value;
     const password = document.getElementById('signupPassword').value;
     
-    // Use Supabase if available
-    if (supabase) {
-        try {
-            const { data, error } = await supabase.auth.signUp({
-                email: email,
-                password: password,
-                options: { data: { display_name: name } }
-            });
-            
-            if (error) throw error;
-            
-            if (data.user) {
-                const { error: profileError } = await supabase
-                    .from('user_profiles')
-                    .insert({
-                        id: data.user.id,
-                        email: email,
-                        display_name: name,
-                        streak_count: 0,
-                        longest_streak: 0,
-                        mastery_level: 0,
-                        total_meals_planned: 0,
-                        badges: '[]',
-                        kudos_given: 0,
-                        hasCompletedPreferences: 0
-                    });
-            }
-            
-            showAuthSuccess('Account created! Check your email to confirm, then log in.');
-            closeAuthModal();
-            showMainApp();
-            toast('Welcome, ' + name + '!');
-            show('home');
-        } catch (err) {
-            showAuthError(err.message);
-        }
-    } else {
-        // LocalStorage fallback
-        const newUser = {
-            id: 'local_' + Date.now(),
-            email: email,
-            passwordHash: hashPassword(password),
-            display_name: name,
-            streak_count: 0,
-            longest_streak: 0,
-            mastery_level: 0,
-            total_meals_planned: 0,
-            badges: [],
-            kudos_given: 0,
-            hasCompletedPreferences: false
-        };
+    try {
+        const data = await apiCall('/api/signup', {
+            method: 'POST',
+            body: JSON.stringify({ name, email, password })
+        });
         
-        currentUser = { id: newUser.id, email: newUser.email };
-        userProfile = newUser;
-        saveToLocalStorage();
+        // Set as current user
+        currentUser = { id: data.user.id, email: data.user.email };
+        userProfile = { ...data.user };
+        localStorage.setItem('yumbot_user_id', data.user.id);
         
         showAuthSuccess('Account created! Welcome, ' + name + '!');
         closeAuthModal();
         showMainApp();
+        updateGamificationUI();
         toast('Welcome, ' + name + '!');
         show('home');
+    } catch (err) {
+        showAuthError(err.message);
     }
 }
 
@@ -420,59 +286,32 @@ async function handleLogin(event) {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     
-    // Use Supabase if available
-    if (supabase) {
-        try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: email,
-                password: password
-            });
-            
-            if (error) throw error;
-            
-            currentUser = data.user;
-            await loadUserProfile();
-            
-            closeAuthModal();
-            showMainApp();
-            updateGamificationUI();
-            toast('Welcome back, ' + (userProfile?.display_name || 'User') + '!');
-            show('home');
-        } catch (err) {
-            showAuthError(err.message);
-        }
-    } else {
-        // LocalStorage fallback
-        const stored = localStorage.getItem('yumbot_local_user');
-        if (stored) {
-            try {
-                const user = JSON.parse(stored);
-                if (user.email === email && user.passwordHash === hashPassword(password)) {
-                    currentUser = { id: user.id, email: user.email };
-                    userProfile = user;
-                    hasCompletedPreferences = user.hasCompletedPreferences || false;
-                    
-                    closeAuthModal();
-                    showMainApp();
-                    updateGamificationUI();
-                    toast('Welcome back, ' + (user.display_name || 'User') + '!');
-                    show('home');
-                } else {
-                    showAuthError('Incorrect password.');
-                }
-            } catch (e) {
-                showAuthError('Login error. Please try again.');
-            }
-        } else {
-            showAuthError('No account found with this email.');
-        }
+    try {
+        const data = await apiCall('/api/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password })
+        });
+        
+        // Set as current user
+        currentUser = { id: data.user.id, email: data.user.email };
+        userProfile = data.user;
+        hasCompletedPreferences = data.user.hasCompletedPreferences || false;
+        localStorage.setItem('yumbot_user_id', data.user.id);
+        
+        closeAuthModal();
+        showMainApp();
+        updateGamificationUI();
+        toast('Welcome back, ' + (data.user.display_name || 'User') + '!');
+        show('home');
+    } catch (err) {
+        showAuthError(err.message);
     }
 }
 
-async function handleLogout() {
-    if (supabase) await supabase.auth.signOut();
+function handleLogout() {
     currentUser = null;
     userProfile = null;
+    localStorage.removeItem('yumbot_user_id');
     updateUIForLoggedOutUser();
     toast('Logged out');
 }
@@ -721,7 +560,7 @@ var R = {
 {n:'Creamy Blueberry Porridge', t:10, d:'Easy', c:'British', hot:false, tags:['Vegetarian','High-Fibre'], img:'https://images.unsplash.com/photo-1517673400267-0251440c45dc?w=600&h=400&fit=crop', vidId:'B0nTWpAoizo', ing:['100g rolled oats','400ml whole milk','100g fresh blueberries','1 tbsp honey','Pinch of salt'], steps:['Bring milk to a gentle simmer in a saucepan.','Add oats and salt, stir constantly 4-5 minutes until thick and creamy.','Spoon into bowls, top with blueberries and drizzle with honey.']},
 {n:'Avocado Toast & Poached Egg', t:10, d:'Easy', c:'Modern', hot:false, tags:['Vegetarian'], img:'https://images.unsplash.com/photo-1541519227354-08fa5d50c44d?w=600&h=400&fit=crop', vidId:'xdZ4oYzBOJg', ing:['2 slices sourdough','1 ripe avocado','2 large eggs','Lemon juice','Chilli flakes','Salt and pepper'], steps:['Toast bread until golden and crisp.','Mash avocado with lemon juice, salt, and pepper.','Poach eggs 3 minutes in simmering water. Lay on toast, add chilli flakes.']},
 {n:'Shakshuka', t:25, d:'Easy', c:'Middle Eastern', hot:true, tags:['Vegetarian','Gluten-Free'], img:'https://images.unsplash.com/photo-1590412200988-a436970781fa?w=600&h=400&fit=crop', vidId:'PEsMSwY0vgo', ing:['4 large eggs','2x400g tins chopped tomatoes','1 red pepper','1 onion','3 garlic cloves','1 tsp cumin','1 tsp smoked paprika','Fresh coriander'], steps:['Fry onion, pepper, and garlic in olive oil for 5 minutes.','Add spices and tomatoes. Simmer 10 minutes until thick.','Make 4 wells, crack in eggs, cover until whites set. Top with coriander.']},
-{n:'Overnight Chia Pudding', t:5, d:'Easy', c:'Modern', hot:false, tags:['Vegan','Gluten-Free'], img:'https://images.unsplash.com/photo-1474710152274-77a5f7a4ff2a?w=600&h=400&fit=crop', vidId:'V73h4yhLVhA', ing:['3 tbsp chia seeds','200ml oat milk','1 tsp vanilla','1 tbsp maple syrup','Seasonal fruit to top'], steps:['Mix chia seeds, oat milk, vanilla, and maple syrup in a jar.','Refrigerate overnight for at least 6 hours.','Stir in the morning and top with fresh fruit.']},
+{n:'Overnight Chia Pudding', t:5, d:'Easy', c:'Modern', hot:false, tags:['Vegan','Gluten-Free'], img:'https://images.unsplash.com/photo-1558961363-fa8c7fb010b8?w=600&h=400&fit=crop', vidId:'V73h4yhLVhA', ing:['3 tbsp chia seeds','200ml oat milk','1 tsp vanilla','1 tbsp maple syrup','Seasonal fruit to top'], steps:['Mix chia seeds, oat milk, vanilla, and maple syrup in a jar.','Refrigerate overnight for at least 6 hours.','Stir in the morning and top with fresh fruit.']},
 {n:'Keto Bacon & Eggs', t:10, d:'Easy', c:'British', hot:true, tags:['Keto','Low-Carb','Gluten-Free'], img:'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=600&h=400&fit=crop', vidId:'XgTx5lXgaqQ', ing:['3 rashers smoked back bacon','2 large eggs','1/2 ripe avocado','Knob of butter','Salt and pepper'], steps:['Fry bacon in a hot pan until the edges are crisp.','Melt butter in the same pan, cook eggs sunny-side up.','Serve alongside sliced avocado and cracked black pepper.']},
 {n:'Vegan Smoothie Bowl', t:5, d:'Easy', c:'Modern', hot:false, tags:['Vegan','Gluten-Free'], img:'https://images.pexels.com/photos/34227827/pexels-photo-34227827.jpeg?auto=compress&cs=tinysrgb&w=600&h=400&fit=crop', vidId:'3LoGRXiGWAk', ing:['1 frozen banana','1/2 cup frozen mango','100ml oat milk','2 tbsp granola','1 tbsp chia seeds','Fresh strawberries'], steps:['Blend banana, mango, and oat milk until thick.','Pour into a chilled bowl.','Top with granola, chia seeds, and strawberries.']},
 {n:'Japanese Tamagoyaki', t:15, d:'Medium', c:'Japanese', hot:true, tags:['Gluten-Free','High-Protein'], img:'https://images.unsplash.com/photo-1607330289024-1535c6b4e1c1?w=600&h=400&fit=crop', vidId:'U21GQ0Xgx_0', ing:['4 eggs','1 tbsp dashi stock','1 tbsp soy sauce','1 tsp sugar','Vegetable oil'], steps:['Whisk eggs with dashi, soy sauce, and sugar.','Heat a rectangular pan, lightly oil. Pour thin layer of egg.','Roll and push to one side. Repeat layers. Slice and serve.']}
@@ -953,10 +792,37 @@ function getWeeksInYear(year) {
 }
 
 function pick(arr, used) {
-used = used || [];
-var filtered = arr.filter(function(r) { return used.indexOf(r.n) === -1; });
-if (filtered.length === 0) return arr[Math.floor(Math.random() * arr.length)];
-return filtered[Math.floor(Math.random() * filtered.length)];
+    var filtered = arr.filter(function(r) { return used.indexOf(r.n) === -1; });
+    if (filtered.length === 0) {
+        used.length = 0;
+        filtered = arr;
+    }
+    return filtered[Math.floor(Math.random() * filtered.length)];
+}
+
+function buildYearPlan() {
+  var year = parseInt(document.getElementById('yearSelect').value);
+  var weeks = getWeeksInYear(year);
+  S.yearPlan = {};
+  S.allWeeks = weeks;
+  weeks.forEach(function(week) {
+    var weekLabel = 'Week ' + week.weekNum;
+    S.yearPlan[weekLabel] = {};
+    var usedBreakfast = [], usedLunch = [], usedDinner = [];
+    week.days.forEach(function(dayData) {
+      var dayName = dayData.dayName;
+      var b = pick(R.breakfast, usedBreakfast);
+      var l = pick(R.lunch, usedLunch);
+      var d = pick(R.dinner, usedDinner);
+      usedBreakfast.push(b.n);
+      usedLunch.push(l.n);
+      usedDinner.push(d.n);
+      S.yearPlan[weekLabel][dayName] = { breakfast: b, lunch: l, dinner: d };
+    });
+  });
+  
+  goToCurrentWeek();
+  renderYearPlan();
 }
 
 function buildYearPlan() {
@@ -1306,62 +1172,44 @@ function adminLogout() {
 }
 
 async function loadAdminStats() {
-    if (usingLocalStorage || !supabase) {
-        // Show localStorage users
-        const stored = localStorage.getItem('yumbot_local_user');
-        if (stored) {
-            try {
-                const user = JSON.parse(stored);
-                document.getElementById('statTotalUsers').textContent = '1';
-                document.getElementById('statActiveUsers').textContent = user.hasCompletedPreferences ? '1' : '0';
-                document.getElementById('adminUserTable').innerHTML = `
-                    <tr>
-                        <td style="padding:0.75rem">${user.email}</td>
-                        <td style="padding:0.75rem">${user.display_name || 'Unknown'}</td>
-                        <td style="padding:0.75rem">${user.streak_count || 0}</td>
-                        <td style="padding:0.75rem">${user.total_meals_planned || 0}</td>
-                        <td style="padding:0.75rem">Local</td>
-                    </tr>
-                `;
-                return;
-            } catch (e) {}
-        }
-        document.getElementById('statTotalUsers').textContent = '0';
-        document.getElementById('statActiveUsers').textContent = '0';
-        document.getElementById('adminUserTable').innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#999">Using local mode (data not synced to server)</td></tr>';
-        return;
-    }
-    
     try {
-        const { data: users, error } = await supabase
-            .from('user_profiles')
-            .select('*');
+        const data = await fetch(API_URL + '/api/admin/users', {
+            headers: { 'x-admin-key': ADMIN_KEY }
+        }).then(r => r.json());
         
-        if (error) throw error;
+        let users = data.users || [];
+        let totalUsers = users.length;
+        let activeUsers = users.filter(u => u.hasCompletedPreferences).length;
+        let allUsers = users.map(u => ({
+            email: u.email || 'N/A',
+            name: u.display_name || 'Unknown',
+            streak: u.streak_count || 0,
+            meals: u.total_meals_planned || 0,
+            date: u.created_at || 'Unknown'
+        }));
         
-        let totalUsers = users?.length || 0;
-        let activeUsers = users?.filter(u => u.hasCompletedPreferences === 1 || u.hasCompletedPreferences === true).length || 0;
-        
+        // Update stats
         document.getElementById('statTotalUsers').textContent = totalUsers;
         document.getElementById('statActiveUsers').textContent = activeUsers;
         
+        // Populate table
         const tbody = document.getElementById('adminUserTable');
         tbody.innerHTML = '';
         
-        if (users && users.length > 0) {
-            users.forEach(user => {
-                const row = document.createElement('tr');
-                row.style.borderBottom = '1px solid #eee';
-                row.innerHTML = `
-                    <td style="padding:0.75rem">${user.email || 'N/A'}</td>
-                    <td style="padding:0.75rem">${user.display_name || 'Unknown'}</td>
-                    <td style="padding:0.75rem">${user.streak_count || 0}</td>
-                    <td style="padding:0.75rem">${user.total_meals_planned || 0}</td>
-                    <td style="padding:0.75rem">${user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        } else {
+        allUsers.forEach(user => {
+            const row = document.createElement('tr');
+            row.style.borderBottom = '1px solid #eee';
+            row.innerHTML = `
+                <td style="padding:0.75rem">${user.email}</td>
+                <td style="padding:0.75rem">${user.name}</td>
+                <td style="padding:0.75rem">${user.streak}</td>
+                <td style="padding:0.75rem">${user.meals}</td>
+                <td style="padding:0.75rem">${user.date}</td>
+            `;
+            tbody.appendChild(row);
+        });
+        
+        if (allUsers.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#999">No users found</td></tr>';
         }
     } catch (err) {
@@ -1384,7 +1232,6 @@ function enableAdminMode() {
 }
 
 // Initialize immediately if DOM already loaded
-// Initialize immediately if DOM already loaded
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initApp);
 } else {
@@ -1392,16 +1239,6 @@ if (document.readyState === 'loading') {
 }
 
 async function initApp() {
-    // Initialize Supabase
-    await initSupabase();
-    
-    // Show mode indicator
-    if (usingLocalStorage) {
-        setTimeout(() => {
-            toast('⚠️ Running in offline mode - data saved locally');
-        }, 2000);
-    }
-    
     // Initialize dark mode
     initDarkMode();
     
@@ -1418,4 +1255,21 @@ async function initApp() {
     buildHomeGrid();
     buildDPBand();
     initYearSelector();
+    
+    // Check if user is already logged in
+    const savedUserId = localStorage.getItem('yumbot_user_id');
+    if (savedUserId) {
+        try {
+            const data = await apiCall('/api/profile');
+            if (data.user) {
+                currentUser = { id: data.user.id, email: data.user.email };
+                userProfile = data.user;
+                hasCompletedPreferences = data.user.hasCompletedPreferences || false;
+                showMainApp();
+            }
+        } catch (err) {
+            console.log('Could not restore session');
+            localStorage.removeItem('yumbot_user_id');
+        }
+    }
 }

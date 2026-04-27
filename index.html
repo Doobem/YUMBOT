@@ -87,7 +87,7 @@
       <p class="landing-subtitle">Stop wondering "What's for dinner?" We plan your entire week of meals, create your shopping list, and track your dietary goals — all personalized just for you.</p>
       
       <div class="landing-cta">
-        <button class="landing-btn-primary" onclick="openAuthModal()">Get Started Free</button>
+        <button class="landing-btn-primary" onclick="showMainApp()">Get Started Free</button>
         <button class="landing-btn-secondary" onclick="scrollToCrew()">Meet the Kitchen Crew ↓</button>
       </div>
       
@@ -181,7 +181,7 @@
       </div>
     </div>
     
-    <button class="landing-btn-primary" onclick="openAuthModal()">Start Your Journey →</button>
+    <button class="landing-btn-primary" onclick="showMainApp()">Start Your Journey →</button>
   </div>
   
   <!-- FOOTER -->
@@ -218,7 +218,7 @@
         <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
         <span class="toggle-slider"></span>
       </label>
-      <button class="nb" id="authBtn" onclick="openAuthModal()">Sign In</button>
+      <button class="nb" id="authBtn" onclick="show('profile')">My Profile</button>
     </nav>
     <button class="hbg" onclick="document.getElementById('nav').classList.toggle('open')">Menu</button>
   </div>
@@ -606,9 +606,7 @@
   <p class="fsub">Made with love - Improved every week - For everyone at the table</p>
 </footer>
 
-<script>
-window.supabaseLoaded = false;
-</script>
-<script src="app.js" onerror="console.log('App loaded without Supabase')"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js"></script>
 </body>
 </html>
